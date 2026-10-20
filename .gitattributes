@@ -1,0 +1,20 @@
+* text=auto
+
+*.cs text eol=lf diff=csharp
+*.meta text eol=lf
+*.asset text eol=lf
+*.unity text eol=lf
+*.prefab text eol=lf
+*.mat text eol=lf
+*.shader text eol=lf
+*.json text eol=lf
+
+*.png binary
+*.jpg binary
+*.tga binary
+*.psd binary
+*.fbx binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.dll binary
