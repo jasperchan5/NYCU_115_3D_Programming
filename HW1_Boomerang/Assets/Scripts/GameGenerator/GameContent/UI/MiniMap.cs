@@ -9,8 +9,8 @@ public class MiniMap : MonoBehaviour
     public bool rotateWithPlayer = false;
 
     [Header("UI")]
-    public Vector2 size = new Vector2(200f, 200f);
-    public Vector2 anchoredPos = new Vector2(-20f, -20f);   // 右下角
+    public Vector2 size = new Vector2(350f, 350f);
+    public Vector2 anchoredPos = new Vector2(-20f, -20f);   
     public float borderThickness = 3f;
     public Color borderColor = new Color(1f, 1f, 1f, 0.8f);
 

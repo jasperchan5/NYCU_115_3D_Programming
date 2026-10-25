@@ -352,7 +352,7 @@ MonoBehaviour:
   height: 40
   orthoSize: 25
   rotateWithPlayer: 0
-  size: {x: 200, y: 200}
+  size: {x: 350, y: 350}
   anchoredPos: {x: -20, y: -20}
   borderThickness: 3
   borderColor: {r: 1, g: 1, b: 1, a: 0.8}
@@ -580,6 +580,8 @@ MonoBehaviour:
   maxAttemptsPerObject: 30
   edgeMargin: 2
   platformClearRadius: 10
+  obstacleScaleRange: {x: 0.7, y: 1.7}
+  scaleMassWithSize: 1
   targetMaterial: {fileID: 0}
   obstacleMaterial: {fileID: 2100000, guid: 3b5cc91c3bf8cf74391252247f52fb59, type: 2}
   boundary: {fileID: 589118545}
