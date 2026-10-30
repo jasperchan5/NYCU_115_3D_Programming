@@ -24,6 +24,8 @@ namespace Allomancy
         public bool IsGrounded => cc.isGrounded;
         
         Transform cloak;
+        Transform legL, legR;                      // 腿的關節（髖部）
+        float walkPhase;
         float yaw, pitch = 12f, vy, sway;
         Vector3 planarVelocity;
         Vector3 pushVelocity;                      // 被推拉產生的水平速度（和走路速度分開，才不會被走路蓋掉）
@@ -49,12 +51,25 @@ namespace Allomancy
             p.cloak.SetParent(root, false);
             Build.Prim(PrimitiveType.Capsule, p.cloak, new Vector3(0, 1.05f, 0), new Vector3(0.6f, 0.75f, 0.45f), dark);
             Build.Prim(PrimitiveType.Sphere, root, new Vector3(0, 1.78f, 0), new Vector3(0.42f, 0.46f, 0.44f), dark, name: "Hood");
+            var legMat = Build.Mat(new Color(0.08f, 0.08f, 0.1f));
+            p.legL = Joint(root, new Vector3(-0.14f, 0.75f, 0f));
+            p.legR = Joint(root, new Vector3(0.14f, 0.75f, 0f));
+            foreach (var leg in new[] { p.legL, p.legR })
+                Build.Prim(PrimitiveType.Capsule, leg, new Vector3(0, -0.38f, 0), new Vector3(0.2f, 0.38f, 0.2f), legMat, name: "Leg");
 
             // 胸口：鋼線的起點
             p.Chest = new GameObject("Chest").transform;
             p.Chest.SetParent(root, false);
             p.Chest.localPosition = new Vector3(0, 1.35f, 0.25f);
             return p;
+        }
+
+        static Transform Joint(Transform parent, Vector3 localPos)
+        {
+            var t = new GameObject("Hip").transform;
+            t.SetParent(parent, false);
+            t.localPosition = localPos;
+            return t;
         }
 
         void Update()
@@ -103,6 +118,17 @@ namespace Allomancy
             // 斗篷隨速度前後擺動
             sway += dt * planarVelocity.magnitude * 2.5f;
             cloak.localRotation = Quaternion.Euler(-planarVelocity.magnitude * 1.5f + Mathf.Sin(sway) * 3f, 0, Mathf.Cos(sway) * 2f);
+
+            float moving = planarVelocity.magnitude;
+            float legAngle;
+            if (cc.isGrounded)
+            {
+                walkPhase += dt * moving * 2.2f;
+                legAngle = Mathf.Sin(walkPhase) * Mathf.Lerp(0f, 40f, moving / RunSpeed);
+            }
+            else legAngle = 20f;                     // 在空中：一腳前一腳後，像跳起來 / 飛出去的姿勢
+            legL.localRotation = Quaternion.Euler(legAngle, 0, 0);
+            legR.localRotation = Quaternion.Euler(-legAngle, 0, 0);
 
             // 點一下畫面就鎖定滑鼠
             if (mouse.leftButton.wasPressedThisFrame && !selecting) Cursor.lockState = CursorLockMode.Locked;

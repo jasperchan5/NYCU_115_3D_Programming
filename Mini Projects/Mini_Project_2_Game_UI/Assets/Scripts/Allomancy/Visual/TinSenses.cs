@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Allomancy
 {
     /// 
     /// 燃燒錫：感官增強。
-    ///   1. 夜視：環境光變亮、霧變淡 → 昏暗的地方也看得清楚（淡入淡出，不會突然跳）
+    ///   1. 夜視：環境光變亮、加一盞不投影子的補光、霧變淡 → 高牆陰影裡也看得清楚（淡入淡出）
     ///   2. 腳步聲：附近敵人每踩一步，就在螢幕左 / 右邊緣冒出一組往內擴散的聲波弧線
     ///        敵人在你右邊 → 右邊緣；左邊 → 左邊緣
     ///        高度：在你前方 → 偏上；在你背後 → 偏下（用 cos(角度) 決定）
@@ -20,6 +21,7 @@ namespace Allomancy
         RectTransform canvasRect;
         Color baseAmbient;
         float baseFog, fade;
+        Light fill;                         // 夜視用的補光：不投影子的平行光
 
         const float HearRange = 28f;        // 聽得到腳步的距離
         const float WaveTime = 0.7f;        // 一組聲波從出現到消失的秒數
@@ -51,6 +53,14 @@ namespace Allomancy
             // 記住場景原本的亮度（Arena 已經設定好了）
             t.baseAmbient = RenderSettings.ambientLight;
             t.baseFog = RenderSettings.fogDensity;
+
+            // 補光：從上方斜照、不投影子 → 高牆的陰影裡也會被照亮
+            t.fill = new GameObject("TinFillLight").AddComponent<Light>();
+            t.fill.type = LightType.Directional;
+            t.fill.shadows = LightShadows.None;
+            t.fill.color = new Color(0.75f, 0.85f, 1f);              // 偏冷的月光色
+            t.fill.intensity = 0f;
+            t.fill.transform.rotation = Quaternion.Euler(70f, 30f, 0f);
             return t;
         }
 
@@ -63,9 +73,19 @@ namespace Allomancy
         void Update()
         {
             fade = Mathf.MoveTowards(fade, reserves.IsBurning(Metal.Tin) ? 1f : 0f, Time.unscaledDeltaTime * 1.5f);
-            // 環境光 × 2.5 再偏一點冷色；霧的濃度降到 35%
+            // 環境光：× 2.5 再偏一點冷色（環境光沒有方向，陰影裡也會變亮）
             var bright = baseAmbient * 2.5f + new Color(0.05f, 0.07f, 0.1f);
-            RenderSettings.ambientLight = Color.Lerp(baseAmbient, bright, fade);
+            var ambient = Color.Lerp(baseAmbient, bright, fade);
+            RenderSettings.ambientLight = ambient;
+            // URP 的物體實際讀的是 ambientProbe（球諧函數），執行中只改 ambientLight 不一定會更新，
+            // 所以直接用同一個顏色重建一個「各方向一樣亮」的 probe
+            var sh = new SphericalHarmonicsL2();
+            sh.AddAmbientLight(ambient);
+            RenderSettings.ambientProbe = sh;
+
+            // 補光：0 → 0.8；霧的濃度降到 35%
+            fill.intensity = 0.8f * fade;
+            fill.enabled = fade > 0.001f;
             RenderSettings.fogDensity = Mathf.Lerp(baseFog, baseFog * 0.35f, fade);
 
             UpdateWaves(Time.unscaledDeltaTime);

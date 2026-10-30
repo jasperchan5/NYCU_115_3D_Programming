@@ -37,7 +37,7 @@ namespace Allomancy
             for (int i = 0; i < 40; i++)
             {
                 float a = i * 9f;
-                float h = R(3f, 4.5f);
+                float h = R(60f, 90f);
                 var wall = Allomancy.Build.Prim(PrimitiveType.Cube, root, Polar(Radius + 1f, a) + Vector3.up * h / 2f,
                                                 new Vector3(5.4f, h, 1.2f), darkStone, collider: true, name: "Wall");
                 wall.transform.rotation = Quaternion.LookRotation(-Polar(1f, a));

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Allomancy
 {
-    /// <summary>
+    /// 
     /// 燃燒紅銅時：玩家胸口（從背後看就是背上正中央）出現一小團旋轉的半透明紅銅雲。
     /// 照草圖：一團拳頭大小、捲來捲去的雲，不會擋住畫面。
     ///
@@ -15,7 +15,7 @@ namespace Allomancy
     ///     位置 = (sin θ, 上下浮動, cos θ) × 半徑，θ = 時間 × OrbitSpeed
     /// 雲掛在 Chest 底下，所以玩家移動、轉身時軌道會跟著。
     /// 實際的遮蔽效果在 EnemyAllomancy.PlayerPulsing()：燒紅銅時搜尋者感覺不到你。
-    /// </summary>
+    /// 
     public class CopperCloud : MonoBehaviour
     {
         MetalReserves reserves;
