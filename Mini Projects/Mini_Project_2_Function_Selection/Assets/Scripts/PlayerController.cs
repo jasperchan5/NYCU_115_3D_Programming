@@ -6,6 +6,10 @@ namespace FunctionSelection
     /// 
     /// 玩家控制：WASD / 方向鍵移動（相對鏡頭方向），Shift 跑步，Space 跳躍。
     /// 速度與跳躍高度來自選到的角色（CharacterDef），所以不同角色手感不同。
+    /// 鎔金術（AllomancySession 接上）：
+    ///   speedMultiplier：燒白鑞時 × 1.4
+    ///   faceCamera     ：瞄準時角色轉向鏡頭前方
+    ///   AddImpulse     ：鋼推 / 鐵拉把玩家推開、拉過去，在空中幾乎不減速，才能飛出去
     /// 
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
@@ -15,13 +19,17 @@ namespace FunctionSelection
         public CameraDirector cam;
         public float boundsRadius = 60f;
         public bool inputEnabled = true;
+        public float speedMultiplier = 1f;
+        public bool faceCamera;
 
         const float Gravity = 22f;
         CharacterController cc;
         Vector3 planar, knock;
+        Vector3 push;                              // 鋼推 / 鐵拉給的水平速度（和被怪物撞開的 knock 分開，減速方式不同）
         float vy;
 
         public float Speed01 => def == null ? 0f : planar.magnitude / def.runSpeed;
+        public bool IsGrounded => cc.isGrounded;
 
         void Awake()
         {
@@ -55,7 +63,7 @@ namespace FunctionSelection
             var dir = yawRot * new Vector3(input.x, 0, input.y);
             if (dir.sqrMagnitude > 1f) dir.Normalize();
 
-            float targetSpeed = run ? def.runSpeed : def.walkSpeed;
+            float targetSpeed = (run ? def.runSpeed : def.walkSpeed) * speedMultiplier;
             float accel = cc.isGrounded ? 30f : 8f;
             planar = Vector3.MoveTowards(planar, dir * targetSpeed, accel * dt);
 
@@ -67,7 +75,9 @@ namespace FunctionSelection
             vy -= Gravity * dt;
 
             knock = Vector3.MoveTowards(knock, Vector3.zero, 18f * dt);
-            cc.Move((planar + knock + Vector3.up * vy) * dt);
+            cc.Move((planar + knock + push + Vector3.up * vy) * dt);
+            // 推拉的速度：在地上很快被摩擦力停下，在空中幾乎不減（才能飛出去）
+            push = Vector3.MoveTowards(push, Vector3.zero, (cc.isGrounded ? 25f : 2f) * dt);
 
             // 不能走出圍籬
             var flat = new Vector3(transform.position.x, 0, transform.position.z);
@@ -79,23 +89,21 @@ namespace FunctionSelection
                 cc.enabled = true;
             }
 
-            // 平滑轉向移動方向
-            if (dir.sqrMagnitude > 0.01f)
+            // 平滑轉向移動方向；瞄準時轉向鏡頭前方
+            if (faceCamera || dir.sqrMagnitude > 0.01f)
             {
-                var want = Quaternion.LookRotation(dir);
+                var want = faceCamera ? yawRot : Quaternion.LookRotation(dir);
                 transform.rotation = Quaternion.Slerp(transform.rotation, want, 1f - Mathf.Exp(-12f * dt));
             }
 
             rig.SetLocomotion(Speed01, cc.isGrounded);
         }
 
-        /// 被怪物撞到時往後彈。
-        public void Knockback(Vector3 from, float force)
+        /// 被鋼推 / 鐵拉：水平部分加到 push，垂直部分加到 vy（可以被推上天）。
+        public void AddImpulse(Vector3 v)
         {
-            var d = transform.position - from;
-            d.y = 0f;
-            knock = d.normalized * force;
-            vy = 6f;
+            push += new Vector3(v.x, 0f, v.z);
+            vy = Mathf.Max(vy, 0f) + v.y;
         }
 
         public void Teleport(Vector3 pos)
@@ -103,7 +111,7 @@ namespace FunctionSelection
             cc.enabled = false;
             transform.position = pos;
             cc.enabled = true;
-            planar = knock = Vector3.zero;
+            planar = knock = push = Vector3.zero;
             vy = 0f;
         }
     }

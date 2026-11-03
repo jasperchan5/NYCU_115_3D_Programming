@@ -13,8 +13,7 @@ namespace FunctionSelection
         GameApp app;
         RectTransform mainPanel, settingsPanel, charPanel, demoPanel, hudPanel, pausePanel, winPanel;
         Button mainFirst, settingsFirst, charFirst, pauseFirst, winFirst;
-        Text heroLabel, charName, charTitle, charDesc, hudHero, hudGems, hudHp, toast, demoCaption, winText;
-        Image hpFill;
+        Text heroLabel, charName, charTitle, charDesc, hudHero, hudGems, hudTime, toast, demoCaption, winText;
         readonly Image[] statFills = new Image[3];
         float toastTimer;
 
@@ -238,40 +237,31 @@ namespace FunctionSelection
         // =====================================================================
         // 遊戲 HUD
         // =====================================================================
+        // 血量、小地圖、金屬輪盤、操作說明都在鎔金術的 HUD（右下角、左上角）；
+        // 這裡只剩右上角的小框：角色名字、寶石數、遊戲時間。
         void BuildHud(Transform canvas)
         {
             hudPanel = UIFactory.Rect("HUD", canvas);
             UIFactory.Stretch(hudPanel);
 
             var box = UIFactory.Panel("Status", hudPanel, UIFactory.PanelColor);
-            UIFactory.Place(box.rectTransform, new Vector2(0, 1), new Vector2(420, 170), new Vector2(30, -30));
+            UIFactory.Place(box.rectTransform, new Vector2(1, 1), new Vector2(340, 132), new Vector2(-30, -30));
             var col = UIFactory.Rect("Column", box.rectTransform);
-            UIFactory.Stretch(col, 18);
-            UIFactory.VStack(col, 6, 0, TextAnchor.UpperLeft);
-            hudHero = UIFactory.Label(col, "", 30, TextAnchor.MiddleLeft, UIFactory.Accent, FontStyle.Bold);
-            UIFactory.Size(hudHero, 38);
-            hudHp = UIFactory.Label(col, "", 24, TextAnchor.MiddleLeft);
-            UIFactory.Size(hudHp, 30);
-            var hpBg = UIFactory.Panel("HpBar", col, new Color(1, 1, 1, 0.15f));
-            UIFactory.Size(hpBg, 14);
-            hpFill = UIFactory.Panel("Fill", hpBg.rectTransform, new Color(0.9f, 0.3f, 0.3f));
-            hpFill.rectTransform.anchorMin = Vector2.zero;
-            hpFill.rectTransform.anchorMax = Vector2.one;
-            hpFill.rectTransform.offsetMin = hpFill.rectTransform.offsetMax = Vector2.zero;
-            hudGems = UIFactory.Label(col, "", 26, TextAnchor.MiddleLeft);
-            UIFactory.Size(hudGems, 34);
-
-            var hint = UIFactory.Label(hudPanel, "WASD move   ·   Shift run   ·   Space jump   ·   Mouse look   ·   Wheel zoom   ·   Esc pause",
-                                       22, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.7f));
-            UIFactory.Place(hint.rectTransform, new Vector2(0.5f, 0f), new Vector2(1500, 40), new Vector2(0, 20));
+            UIFactory.Stretch(col, 16);
+            UIFactory.VStack(col, 4, 0, TextAnchor.UpperLeft);
+            hudHero = UIFactory.Label(col, "", 26, TextAnchor.MiddleLeft, UIFactory.Accent, FontStyle.Bold);
+            UIFactory.Size(hudHero, 34);
+            hudGems = UIFactory.Label(col, "", 24, TextAnchor.MiddleLeft);
+            UIFactory.Size(hudGems, 30);
+            hudTime = UIFactory.Label(col, "", 24, TextAnchor.MiddleLeft);
+            UIFactory.Size(hudTime, 30);
         }
 
-        public void UpdateHud(CharacterDef def, int hp, int maxHp, int gems, int totalGems, float seconds)
+        public void UpdateHud(CharacterDef def, int gems, int totalGems, float seconds)
         {
             hudHero.text = $"{def.name}  ·  {def.title}";
-            hudHp.text = $"HP  {hp} / {maxHp}";
-            hpFill.rectTransform.anchorMax = new Vector2((float)hp / maxHp, 1f);
-            hudGems.text = $"Gems  {gems} / {totalGems}      Time  {(int)seconds / 60:0}:{(int)seconds % 60:00}";
+            hudGems.text = $"Gems  {gems} / {totalGems}";
+            hudTime.text = $"Time  {(int)seconds / 60:0}:{(int)seconds % 60:00}";
         }
 
         // =====================================================================

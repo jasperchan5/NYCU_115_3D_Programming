@@ -14,6 +14,9 @@ namespace FunctionSelection
     ///      │──Settings──────────▶ Settings
     ///      │──Demo Video────────▶ Demo
     ///      └──Quit
+    ///
+    /// 遊戲關卡 = 村莊 + 鎔金術：StartGame 時建立 AllomancySession（mini 1 的 Game UI），
+    /// 血量改用鎔金術的血量（HUD 右下角的紅色圓弧），被史萊姆或士兵打到都扣同一條血。
     /// 
     public class GameApp : MonoBehaviour
     {
@@ -25,7 +28,8 @@ namespace FunctionSelection
         /// 只有在遊戲中才回傳玩家（怪物追人、撿寶石都靠它判斷）。
         public PlayerController ActivePlayer => Current == State.InGame ? player : null;
 
-        const int MaxHp = 5;
+        /// 正在玩（不是暫停、也還沒過關）：只有這時候可以操作鎔金術。
+        public bool Playing => Current == State.InGame && !won;
 
         Camera cam;
         CameraDirector director;
@@ -34,12 +38,13 @@ namespace FunctionSelection
         DemoDirector demo;
         MenuUI ui;
         AudioSource musicSource, sfxSource;
-        AudioClip clickClip, hoverClip, collectClip, hurtClip;
+        AudioClip clickClip, hoverClip, collectClip;
 
         PlayerController player;
+        AllomancySession allomancy;
         Transform gemRoot;
         readonly List<Gem> gems = new List<Gem>();
-        int gemsCollected, hp;
+        int gemsCollected;
         float playTime;
         bool won;
         State settingsReturn = State.MainMenu;
@@ -78,7 +83,6 @@ namespace FunctionSelection
             SettingsManager.Init(cam);
 
             level = LevelBuilder.Build(transform);
-            SpawnMonsters();
             showroom = Showroom.Build(transform);
             demo = gameObject.AddComponent<DemoDirector>();
             demo.Finished += EnterMainMenu;
@@ -109,22 +113,7 @@ namespace FunctionSelection
             sfxSource.playOnAwake = false;
             clickClip = AudioSynth.Click();
             hoverClip = AudioSynth.Hover();
-            collectClip = AudioSynth.Collect();
-            hurtClip = AudioSynth.Hurt();
-        }
-
-        void SpawnMonsters()
-        {
-            var root = new GameObject("Monsters").transform;
-            root.SetParent(transform, false);
-            var rng = new System.Random(7);
-            Color[] colors =
-            {
-                new Color(0.45f, 0.85f, 0.4f), new Color(0.65f, 0.4f, 0.9f), new Color(0.95f, 0.45f, 0.4f),
-                new Color(0.35f, 0.7f, 0.95f), new Color(0.95f, 0.75f, 0.3f), new Color(0.9f, 0.5f, 0.8f),
-            };
-            for (int i = 0; i < level.monsterHomes.Count; i++)
-                Monster.Build(root, level.monsterHomes[i], colors[i % colors.Length], rng);
+            collectClip = AudioSynth.Collect();       // 受傷音效改由鎔金術的 HUD 播放
         }
 
         // ------------------------------------------------------------------
@@ -221,14 +210,14 @@ namespace FunctionSelection
             player.cam = director;
             player.boundsRadius = level.radius;
             director.SetThirdPerson(rig.transform);
+            allomancy = AllomancySession.Begin(this, player, director, cam, level);
 
             SpawnGems();
-            hp = MaxHp;
             playTime = 0f;
             won = false;
             if (!musicSource.isPlaying) musicSource.Play();
             SetState(State.InGame);
-            ui.Toast($"Find all {gems.Count} gems — watch out for the slimes!", 4f);
+            ui.Toast($"Find all {gems.Count} gems — watch out for the soldiers!", 4f);
         }
 
         void SpawnGems()
@@ -247,6 +236,8 @@ namespace FunctionSelection
 
         void DespawnPlayer()
         {
+            if (allomancy != null) allomancy.End();     // 立刻還原鏡頭、環境光等設定，再刪除
+            allomancy = null;
             if (player != null) Destroy(player.gameObject);
             player = null;
             if (gemRoot != null) Destroy(gemRoot.gameObject);
@@ -293,25 +284,19 @@ namespace FunctionSelection
                 Time.timeScale = 0f;
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
-                ui.ShowWin(playTime, hp);
+                ui.ShowWin(playTime, Mathf.CeilToInt(allomancy.Health.current));
             }
             else ui.Toast($"Gem!  {gems.Count} left", 1.2f);
         }
 
-        public void OnPlayerHit(Monster m)
+        /// 給 AllomancySession 用：顯示提示訊息。
+        public void Toast(string message, float seconds = 2.5f) => ui.Toast(message, seconds);
+
+        /// 還沒撿到的寶石位置（小地圖畫金點用）。
+        public IEnumerable<Vector3> GemPositions()
         {
-            if (player == null) return;
-            hp--;
-            sfxSource.PlayOneShot(hurtClip);
-            Burst.At(player.transform.position + Vector3.up, new Color(1f, 0.3f, 0.3f), 25, 3f);
-            player.Knockback(m.transform.position, 9f);
-            if (hp <= 0)
-            {
-                hp = MaxHp;
-                player.Teleport(level.playerSpawn);
-                ui.Toast("You fainted!  Back to the plaza.", 3f);
-            }
-            else ui.Toast("Ouch!", 0.8f);
+            foreach (var g in gems)
+                if (g != null) yield return g.transform.position;
         }
 
         public void PlayClick() { if (sfxSource != null) sfxSource.PlayOneShot(clickClip); }
@@ -356,7 +341,7 @@ namespace FunctionSelection
             }
 
             if ((Current == State.InGame || Current == State.Paused) && player != null)
-                ui.UpdateHud(player.def, hp, MaxHp, gemsCollected, gemsCollected + gems.Count, playTime);
+                ui.UpdateHud(player.def, gemsCollected, gemsCollected + gems.Count, playTime);
         }
 
         void OnDestroy()

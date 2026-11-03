@@ -9,7 +9,6 @@ namespace FunctionSelection
         public Transform root;
         public Vector3 playerSpawn;
         public List<Vector3> gemPoints = new List<Vector3>();
-        public List<Vector3> monsterHomes = new List<Vector3>();
         public List<Vector3> tourPoints = new List<Vector3>();   // 示範模式的自動導覽路線
         public float radius;                                    // 可活動範圍
         public int objectCount;                                 // 迴圈產生的物件數（報告用）
@@ -73,7 +72,6 @@ namespace FunctionSelection
 
                 // 每間房屋前一顆寶石、屋後一個怪物出沒點
                 info.gemPoints.Add(Polar(VillageRadius - 6f, ang) + Vector3.up * 1f);
-                info.monsterHomes.Add(Polar(VillageRadius + 10f, ang + 20f));
                 houseAngles.Add(ang);
                 info.objectCount++;
             }
