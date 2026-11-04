@@ -51,22 +51,33 @@ namespace FunctionSelection
             titleGroup = title.gameObject.AddComponent<CanvasGroup>();
             titleGroup.alpha = 0f;
 
-            // 目標欄：左上角的半透明框
+            // 目標欄：左上角的半透明框。寬度固定 560，高度自動配合內容：
+            //   VerticalLayoutGroup：三段文字由上往下排，四周留邊距，並且把寬度交給文字（文字才知道在哪裡換行）
+            //   ContentSizeFitter  ：框的高度 = 內容需要的高度 → 文字再長、換再多行都不會超出框
             var box = new GameObject("Objective", typeof(RectTransform), typeof(CanvasRenderer)).AddComponent<Image>();
             box.transform.SetParent(transform, false);
             box.color = new Color(0.04f, 0.05f, 0.09f, 0.7f);
             box.raycastTarget = false;
             var rt = box.rectTransform;
-            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 1f);
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 1f);    // 釘在左上角，往下長
             rt.anchoredPosition = new Vector2(24f, -24f);
-            rt.sizeDelta = new Vector2(560f, 150f);
-            var header = NewText("Header", 18, TextAnchor.UpperLeft, new Vector2(0f, 1f), new Vector2(18f, -12f), new Vector2(520f, 24f), box.transform);
+            rt.sizeDelta = new Vector2(560f, 0f);
+            var layout = box.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(18, 18, 12, 12);
+            layout.spacing = 6f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            var fitter = box.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var header = NewBoxText("Header", 18, box.transform);
             header.text = "OBJECTIVE";
             header.color = new Color(1f, 0.8f, 0.35f);
             header.fontStyle = FontStyle.Bold;
-            objective = NewText("Text", 22, TextAnchor.UpperLeft, new Vector2(0f, 1f), new Vector2(18f, -40f), new Vector2(524f, 72f), box.transform);
-            objective.horizontalOverflow = HorizontalWrapMode.Wrap;
-            var controls = NewText("Controls", 15, TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(18f, 10f), new Vector2(524f, 22f), box.transform);
+            objective = NewBoxText("Text", 22, box.transform);
+            var controls = NewBoxText("Controls", 15, box.transform);
             controls.text = "MMB: wheel  1–8: quick burn  RMB: aim  Scroll: push / pull  Tab: skip line  Esc: pause";
             controls.color = new Color(1f, 1f, 1f, 0.55f);
 
@@ -92,6 +103,14 @@ namespace FunctionSelection
             t.rectTransform.anchoredPosition = pos;
             t.rectTransform.sizeDelta = sizeDelta;
             t.gameObject.AddComponent<Outline>().effectColor = new Color(0f, 0f, 0f, 0.9f);
+            return t;
+        }
+
+        /// 目標欄裡的文字：位置與大小交給 VerticalLayoutGroup，超過寬度就換行。
+        Text NewBoxText(string name, int size, Transform box)
+        {
+            var t = NewText(name, size, TextAnchor.UpperLeft, new Vector2(0f, 1f), Vector2.zero, Vector2.zero, box);
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
             return t;
         }
 
