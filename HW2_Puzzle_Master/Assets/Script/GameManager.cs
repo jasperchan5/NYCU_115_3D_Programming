@@ -33,6 +33,7 @@ namespace PuzzleMaster
             Instance = this;
             IntroScreen.Create(this);
             SetState(GameState.Intro);
+            StartingArea.Build(transform);                // 初始平台 + 三個角色（開場畫面半透明，後面看得到）
         }
 
         void Update()
