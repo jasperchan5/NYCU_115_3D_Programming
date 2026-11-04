@@ -58,7 +58,7 @@ namespace FunctionSelection
             UIFactory.Size(mainFirst, 76);
             UIFactory.Size(UIFactory.Button(col, "Character Select", () => app.EnterCharacterSelect()), 76);
             UIFactory.Size(UIFactory.Button(col, "Settings", () => app.EnterSettings()), 76);
-            UIFactory.Size(UIFactory.Button(col, "Demo Video", () => app.EnterDemo()), 76);
+            UIFactory.Size(UIFactory.Button(col, "Demo", () => app.EnterDemo()), 76);
             UIFactory.Size(UIFactory.Button(col, "Quit", () => app.Quit()), 76);
 
             UIFactory.Size(UIFactory.Rect("Gap", col), 24);
@@ -231,7 +231,7 @@ namespace FunctionSelection
         {
             demoCaption.text = video
                 ? "DEMO VIDEO"
-                : "LIVE DEMO  —  no video file found, showing real-time gameplay.  Put a recording at  StreamingAssets/demo.mp4  to play it here.";
+                : "DEMO  —  a guided tour of the village and the road to the wall.   Esc: back to menu";
         }
 
         // =====================================================================

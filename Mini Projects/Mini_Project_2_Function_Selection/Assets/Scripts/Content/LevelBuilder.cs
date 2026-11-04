@@ -422,6 +422,19 @@ namespace FunctionSelection
             Geo.PointLight(beacon, new Vector3(0, 4.4f, 0), new Color(1f, 0.6f, 0.25f), 14f, 2.5f);
             var landing = Geo.Pivot("Landing", beacon, Vector3.zero);
             landing.position = info.beaconLanding;
+
+            // 牆頂巡邏的士兵：左右各 2 個，在步道上來回走（避開中間的烽火柱）
+            int guard = 0;
+            foreach (int side in new[] { -1, 1 })
+            {
+                foreach (float z in new[] { WallZ + 1.6f, WallZ + 2.6f })
+                {
+                    WallGuard.Build(wall, new Vector3(side * 6f, WallHeight, z), new Vector3(side * 36f, WallHeight, z), (0.25f + 0.4f * guard) % 1f);   // 起點錯開
+                    guard++;
+                    count++;
+                }
+            }
+
             return count;
         }
 
