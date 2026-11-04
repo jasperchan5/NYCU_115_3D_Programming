@@ -13,7 +13,7 @@ namespace FunctionSelection
         GameApp app;
         RectTransform mainPanel, settingsPanel, charPanel, demoPanel, hudPanel, pausePanel, winPanel;
         Button mainFirst, settingsFirst, charFirst, pauseFirst, winFirst;
-        Text heroLabel, charName, charTitle, charDesc, hudHero, hudGems, hudTime, toast, demoCaption, winText;
+        Text heroLabel, charName, charTitle, charDesc, hudHero, hudChapter, hudTime, toast, demoCaption, winText;
         readonly Image[] statFills = new Image[3];
         float toastTimer;
 
@@ -238,7 +238,7 @@ namespace FunctionSelection
         // 遊戲 HUD
         // =====================================================================
         // 血量、小地圖、金屬輪盤、操作說明都在鎔金術的 HUD（右下角、左上角）；
-        // 這裡只剩右上角的小框：角色名字、寶石數、遊戲時間。
+        // 這裡只剩右上角的小框：角色名字、章節、遊戲時間。
         void BuildHud(Transform canvas)
         {
             hudPanel = UIFactory.Rect("HUD", canvas);
@@ -251,16 +251,15 @@ namespace FunctionSelection
             UIFactory.VStack(col, 4, 0, TextAnchor.UpperLeft);
             hudHero = UIFactory.Label(col, "", 26, TextAnchor.MiddleLeft, UIFactory.Accent, FontStyle.Bold);
             UIFactory.Size(hudHero, 34);
-            hudGems = UIFactory.Label(col, "", 24, TextAnchor.MiddleLeft);
-            UIFactory.Size(hudGems, 30);
+            hudChapter = UIFactory.Label(col, "Chapter 1  ·  Starting Area", 22, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.8f));
+            UIFactory.Size(hudChapter, 30);
             hudTime = UIFactory.Label(col, "", 24, TextAnchor.MiddleLeft);
             UIFactory.Size(hudTime, 30);
         }
 
-        public void UpdateHud(CharacterDef def, int gems, int totalGems, float seconds)
+        public void UpdateHud(CharacterDef def, float seconds)
         {
             hudHero.text = $"{def.name}  ·  {def.title}";
-            hudGems.text = $"Gems  {gems} / {totalGems}";
             hudTime.text = $"Time  {(int)seconds / 60:0}:{(int)seconds % 60:00}";
         }
 
@@ -294,7 +293,7 @@ namespace FunctionSelection
             var col = UIFactory.Rect("Column", box.rectTransform);
             UIFactory.Stretch(col, 40);
             UIFactory.VStack(col, 16);
-            UIFactory.Size(UIFactory.Label(col, "ALL GEMS FOUND!", 50, TextAnchor.MiddleCenter, UIFactory.Accent, FontStyle.Bold), 76);
+            UIFactory.Size(UIFactory.Label(col, "CHAPTER 1 COMPLETE", 50, TextAnchor.MiddleCenter, UIFactory.Accent, FontStyle.Bold), 76);
             winText = UIFactory.Label(col, "", 28, TextAnchor.MiddleCenter);
             UIFactory.Size(winText, 60);
             winFirst = UIFactory.Button(col, "Play Again", () => app.StartGame());
@@ -302,9 +301,9 @@ namespace FunctionSelection
             UIFactory.Size(UIFactory.Button(col, "Main Menu", () => app.EnterMainMenu()), 72);
         }
 
-        public void ShowWin(float seconds, int hp)
+        public void ShowWin(float seconds)
         {
-            winText.text = $"Time  {(int)seconds / 60:0}:{(int)seconds % 60:00}      HP left  {hp}";
+            winText.text = $"The wall is behind you.      Time  {(int)seconds / 60:0}:{(int)seconds % 60:00}";
             winPanel.gameObject.SetActive(true);
             Focus(winFirst);
         }

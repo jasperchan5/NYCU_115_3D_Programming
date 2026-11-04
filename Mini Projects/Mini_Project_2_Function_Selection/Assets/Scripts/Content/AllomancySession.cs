@@ -6,27 +6,31 @@ using UnityEngine.UI;
 namespace FunctionSelection
 {
     ///
-    /// 把鎔金術（mini 1 的 Game UI）接進村莊關卡。
+    /// 把鎔金術（mini 1 的 Game UI）接進遊戲關卡。
     ///   按下 Start Game：GameApp 呼叫 Begin()，在選到的角色身上加上金屬存量、血量、瞄準、藍線、光暈，
-    ///                    村莊裡加上金屬物件、士兵、藥瓶，畫面加上鎔金術的 HUD。
-    ///   回主選單 / 重玩：GameApp 刪掉這個物件，OnDestroy() 把村莊、鏡頭、時間設定全部還原。
+    ///                    關卡裡掛上金屬（路燈、橋柱、牆上的鐵釘、烽火柱）、放上木柵欄與藥瓶，畫面加上鎔金術的 HUD。
+    ///   回主選單 / 重玩：GameApp 呼叫 End()，把關卡、鏡頭、時間設定全部還原。
+    ///
+    /// 這一關只會用到鐵和鋼，而且一開始體內沒有任何金屬：要等劇情裡喝下溶液（GrantIronAndSteel）才能燒。
     ///
     /// 兩邊的分工：
-    ///   村莊（FunctionSelection）：移動、跳躍、鏡頭、選單、暫停、寶石、史萊姆
-    ///   鎔金術（Allomancy）       ：金屬輪盤、HUD、瞄準與推拉、各種金屬的效果、士兵
+    ///   關卡（FunctionSelection）：移動、跳躍、鏡頭、選單、暫停、劇情與字幕
+    ///   鎔金術（Allomancy）       ：金屬輪盤、HUD、瞄準與推拉、各種金屬的效果
     /// 這個類別是兩邊唯一的接點，所以鎔金術的程式完全不需要知道村莊的存在。
     ///
     public class AllomancySession : MonoBehaviour
     {
         public MetalReserves Reserves { get; private set; }
         public PlayerHealth Health { get; private set; }
+        public GameHud Hud { get; private set; }
+        public LevelMetals.Layout Layout => layout;
 
         GameApp app;
         PlayerController mover;
         CameraDirector director;
         AllomancyPlayer allomancer;
         Canvas canvas;
-        VillageMetals.Layout layout;
+        LevelMetals.Layout layout;
         ParticleSystem flare;
         TinSenses tin;
         Vector3 spawn;
@@ -47,6 +51,7 @@ namespace FunctionSelection
             // 1. 玩家：金屬存量、血量，以及給鎔金術模組用的 AllomancyPlayer
             var player = mover.gameObject;
             s.Reserves = player.AddComponent<MetalReserves>();
+            for (int i = 0; i < MetalInfo.Count; i++) s.Reserves.amount[i] = 0f;   // 一開始體內沒有金屬
             s.Health = player.AddComponent<PlayerHealth>();
             s.Health.reserves = s.Reserves;
             s.Health.Died += s.OnDied;
@@ -54,30 +59,17 @@ namespace FunctionSelection
             s.allomancer = player.AddComponent<AllomancyPlayer>();
             s.allomancer.reserves = s.Reserves;
             s.allomancer.Chest = CreateChest(mover.rig);
-            s.allomancer.groundedCheck = () => mover.IsGrounded;     // 接上三個插座
+            s.allomancer.groundedCheck = () => mover.IsGrounded;     // 接上插座
             s.allomancer.impulseHandler = mover.AddImpulse;
+            s.allomancer.launchHandler = mover.Launch;
             s.allomancer.canAct = () => app.Playing;
+            s.allomancer.gravity = PlayerController.Gravity;
 
             MetalObject.PlayerMass = 70f * mover.def.bulk;            // 越壯的角色越重：Lerk 94.5、Dean 63、Haze 73.5 公斤
             director.scrollZoom = false;                              // 滾輪改成推 / 拉
 
-            // 2. 村莊裡的金屬、士兵（4 種各一個）、金屬藥瓶
-            s.layout = VillageMetals.Build(s.transform, level.root);
-            for (int i = 0; i < s.layout.soldierHomes.Count; i++)
-            {
-                var e = Enemy.Create(s.transform, s.layout.soldierHomes[i], 4f, i * 1.7f);
-                e.player = player.transform;
-                e.playerHealth = s.Health;
-                e.playerReserves = s.Reserves;
-                EnemyAllomancy.Setup(e, s.Reserves, i);              // 0 搜尋者 / 1 白鑞 / 2 紅銅 / 3 錫
-            }
-            foreach (var p in s.layout.vialPoints)
-            {
-                var v = MetalVial.Create(s.transform, p);
-                v.player = player.transform;
-                v.reserves = s.Reserves;
-                ScentTrail.Attach(v, s.Reserves, player.transform);
-            }
+            // 2. 關卡裡的金屬、木柵欄、藥瓶（這一關沒有敵人）
+            s.layout = LevelMetals.Build(s.transform, level.root, s.Reserves, player.transform);
 
             // 3. 瞄準（右鍵）
             var targeting = player.AddComponent<AllomanticTargeting>();
@@ -87,8 +79,8 @@ namespace FunctionSelection
 
             // 4. UI：建立順序 = 疊放順序（後建立的在上面）
             s.canvas = CreateCanvas(s.transform);
-            var hud = GameHud.Create(s.canvas, player.transform, s.Reserves, s.Health);
-            hud.objectives = app.GemPositions;                        // 小地圖：寶石（金點）
+            s.Hud = GameHud.Create(s.canvas, player.transform, s.Reserves, s.Health);
+            s.Hud.SetHintVisible(false);                              // 操作改由劇情一步一步教（左上角的目標欄）
             BronzeSight.Create(s.canvas, s.Reserves, cam);
             s.tin = TinSenses.Create(s.canvas, player.transform, s.Reserves, cam);
             TargetUI.Create(s.canvas, targeting, cam);
@@ -101,12 +93,21 @@ namespace FunctionSelection
             sight.chest = s.allomancer.Chest;
             sight.view = cam;
             sight.targeting = targeting;
+            sight.range = 60f;                                        // 看得到遠處城牆上的鐵釘（推拉的距離還是 35 公尺）
             PewterAura.Create(s.allomancer, s.Reserves);
             CopperCloud.Create(s.allomancer, s.Reserves);
 
             s.flare = CreateFlare(s.allomancer.Chest);
             s.Reserves.Toggled += s.OnToggled;
             return s;
+        }
+
+        /// 劇情：喝下金屬粉溶液 → 鐵和鋼的存量變滿，藥瓶開始出現。
+        public void GrantIronAndSteel()
+        {
+            Reserves.amount[(int)Metal.Iron] = 1f;
+            Reserves.amount[(int)Metal.Steel] = 1f;
+            layout.vials.gameObject.SetActive(true);
         }
 
         /// 胸口：鋼線的起點。掛在角色的身體（torso）上，走路時會跟著身體上下晃。
@@ -149,10 +150,15 @@ namespace FunctionSelection
         /// 開始燒某種金屬：胸口噴出那種金屬顏色的粒子。
         void OnToggled(Metal m, bool burning)
         {
-            if (!burning) return;
+            if (burning) EmitFlare(MetalInfo.Colors[(int)m]);
+        }
+
+        /// 從胸口噴出一團粒子（燒金屬時、劇情裡喝下金屬粉溶液時）。
+        public void EmitFlare(Color color, int count = 40)
+        {
             var main = flare.main;
-            main.startColor = MetalInfo.Colors[(int)m];
-            flare.Emit(40);
+            main.startColor = color;
+            flare.Emit(count);
         }
 
         /// 血量歸零：回到廣場、補滿血。

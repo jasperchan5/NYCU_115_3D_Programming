@@ -68,17 +68,25 @@ namespace FunctionSelection
             target = t;
         }
 
-        void Awake()
+        /// 這台攝影機本身。第一次用到時才去拿，並記住原本的視角（不依賴 Awake 有沒有執行過）。
+        Camera View
         {
-            view = GetComponent<Camera>();
-            baseFov = view.fieldOfView;
+            get
+            {
+                if (view == null)
+                {
+                    view = GetComponent<Camera>();
+                    if (view != null) baseFov = view.fieldOfView;
+                }
+                return view;
+            }
         }
 
         void LateUpdate()
         {
             float dt = Time.unscaledDeltaTime;
             aimZoom = Mathf.MoveTowards(aimZoom, aiming && mode == Mode.ThirdPerson ? 1f : 0f, dt * 5f);
-            view.fieldOfView = Mathf.Lerp(baseFov, 45f, aimZoom);
+            if (View != null) View.fieldOfView = Mathf.Lerp(baseFov, 45f, aimZoom);
             Vector3 wantPos, wantLook;
             float follow = 4f;   // 越大越緊跟
 

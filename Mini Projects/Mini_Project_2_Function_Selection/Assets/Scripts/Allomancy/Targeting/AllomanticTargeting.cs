@@ -218,6 +218,13 @@ namespace Allomancy
         /// 
         void PushPull(MetalObject target, float sign)
         {
+            // 拉「有落腳點的固定物」（橋柱、城牆上的烽火柱）：用拋體公式算速度，保證剛好落在落腳點
+            if (sign < 0f && target.Anchored && target.landing != null)
+            {
+                player.Launch(BallisticVelocity(player.transform.position, target.landing.position, player.gravity));
+                return;
+            }
+
             var dir = (target.CenterOfMass - player.Chest.position).normalized;   // 玩家 → 目標
             float P = MetalObject.PlayerMass;
             float m = target.MovingMass;
@@ -244,6 +251,28 @@ namespace Allomancy
             {
                 target.owner.Knockback(v);
             }
+        }
+
+        /// 
+        /// 從 from 飛到 to 需要的初速度（拋體運動，只受重力 g）：
+        ///   水平：等速，v水平 = 水平位移 / T
+        ///   垂直：位移 Δy = vy·T − ½·g·T²  →  vy = Δy / T + ½·g·T
+        /// 飛行時間 T 的選法：最高點要比落腳點高出 Margin（才飛得過牆頂的城垛），
+        ///   從最高點落下 Margin 需要 s = √(2·Margin / g) 秒；推導可得 T ≥ s + √(s² + 2·Δy / g)，
+        ///   再依水平距離加長一點（越遠飛越久），限制在 0.6 ~ 3.5 秒。
+        /// 
+        const float Margin = 2.5f;
+
+        static Vector3 BallisticVelocity(Vector3 from, Vector3 to, float g)
+        {
+            var d = to - from;
+            var flat = new Vector3(d.x, 0f, d.z);
+            float s = Mathf.Sqrt(2f * Margin / g);
+            float T = s + Mathf.Sqrt(s * s + 2f * Mathf.Max(d.y, 0f) / g) + flat.magnitude / 20f;
+            T = Mathf.Clamp(T, 0.6f, 3.5f);
+            var v = flat / T;
+            v.y = d.y / T + 0.5f * g * T;
+            return v;
         }
 
         /// 

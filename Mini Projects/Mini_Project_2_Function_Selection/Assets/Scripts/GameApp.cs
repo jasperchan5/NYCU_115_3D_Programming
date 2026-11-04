@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -15,8 +14,9 @@ namespace FunctionSelection
     ///      │──Demo Video────────▶ Demo
     ///      └──Quit
     ///
-    /// 遊戲關卡 = 村莊 + 鎔金術：StartGame 時建立 AllomancySession（mini 1 的 Game UI），
-    /// 血量改用鎔金術的血量（HUD 右下角的紅色圓弧），被史萊姆或士兵打到都扣同一條血。
+    /// 遊戲關卡（只有一關）= 劇本第一幕 Starting Area：
+    ///   StartGame 時建立 AllomancySession（mini 1 的 Game UI）與 StoryDirector（劇情、字幕）；
+    ///   劇情走完（站上城牆）→ CompleteLevel() 顯示過關畫面。
     /// 
     public class GameApp : MonoBehaviour
     {
@@ -25,11 +25,9 @@ namespace FunctionSelection
         public static GameApp I { get; private set; }
         public State Current { get; private set; }
 
-        /// 只有在遊戲中才回傳玩家（怪物追人、撿寶石都靠它判斷）。
-        public PlayerController ActivePlayer => Current == State.InGame ? player : null;
-
         /// 正在玩（不是暫停、也還沒過關）：只有這時候可以操作鎔金術。
         public bool Playing => Current == State.InGame && !won;
+
 
         Camera cam;
         CameraDirector director;
@@ -38,13 +36,11 @@ namespace FunctionSelection
         DemoDirector demo;
         MenuUI ui;
         AudioSource musicSource, sfxSource;
-        AudioClip clickClip, hoverClip, collectClip;
+        AudioClip clickClip, hoverClip;
 
         PlayerController player;
         AllomancySession allomancy;
-        Transform gemRoot;
-        readonly List<Gem> gems = new List<Gem>();
-        int gemsCollected;
+        StoryDirector story;
         float playTime;
         bool won;
         State settingsReturn = State.MainMenu;
@@ -88,7 +84,7 @@ namespace FunctionSelection
             demo.Finished += EnterMainMenu;
             ui = MenuUI.Create(this);
 
-            Debug.Log($"[FunctionSelection] 關卡由迴圈產生了 {level.objectCount} 組物件（房屋、路燈、樹、岩石、花叢、圍籬、遠山）。");
+            Debug.Log($"[FunctionSelection] 關卡由迴圈產生了 {level.objectCount} 組物件（房屋、路燈、樹、岩石、花叢、圍籬、遠山、山壁、橋、城牆、城堡）。");
             EnterMainMenu();
         }
 
@@ -113,7 +109,6 @@ namespace FunctionSelection
             sfxSource.playOnAwake = false;
             clickClip = AudioSynth.Click();
             hoverClip = AudioSynth.Hover();
-            collectClip = AudioSynth.Collect();       // 受傷音效改由鎔金術的 HUD 播放
         }
 
         // ------------------------------------------------------------------
@@ -203,7 +198,7 @@ namespace FunctionSelection
             var def = CharacterCatalog.Selected;
             var rig = CharacterBuilder.Build(def, transform, "Player_" + def.name);
             rig.transform.position = level.playerSpawn;
-            rig.transform.rotation = Quaternion.LookRotation(Vector3.back);   // 背對噴泉、面向村莊南邊
+            rig.transform.rotation = Quaternion.LookRotation(Vector3.forward);   // 面向北方：越過噴泉就看到遠處的城牆
             player = rig.gameObject.AddComponent<PlayerController>();
             player.def = def;
             player.rig = rig;
@@ -211,38 +206,23 @@ namespace FunctionSelection
             player.boundsRadius = level.radius;
             director.SetThirdPerson(rig.transform);
             allomancy = AllomancySession.Begin(this, player, director, cam, level);
+            story = StoryDirector.Begin(this, player, allomancy, level);
+            allomancy.Hud.objectives = story.ObjectiveMarkers;      // 小地圖的金點 = 現在的目標
 
-            SpawnGems();
             playTime = 0f;
             won = false;
             if (!musicSource.isPlaying) musicSource.Play();
             SetState(State.InGame);
-            ui.Toast($"Find all {gems.Count} gems — watch out for the soldiers!", 4f);
-        }
-
-        void SpawnGems()
-        {
-            if (gemRoot != null) Destroy(gemRoot.gameObject);
-            gems.Clear();
-            gemsCollected = 0;
-            gemRoot = new GameObject("Gems").transform;
-            gemRoot.SetParent(transform, false);
-            for (int i = 0; i < level.gemPoints.Count; i++)
-            {
-                var c = Color.HSVToRGB(i / (float)level.gemPoints.Count, 0.6f, 1f);
-                gems.Add(Gem.Build(gemRoot, level.gemPoints[i], c, i * 0.7f));
-            }
         }
 
         void DespawnPlayer()
         {
+            if (story != null) story.End();
+            story = null;
             if (allomancy != null) allomancy.End();     // 立刻還原鏡頭、環境光等設定，再刪除
             allomancy = null;
             if (player != null) Destroy(player.gameObject);
             player = null;
-            if (gemRoot != null) Destroy(gemRoot.gameObject);
-            gemRoot = null;
-            gems.Clear();
         }
 
         public void Pause()
@@ -271,33 +251,19 @@ namespace FunctionSelection
         // 遊戲事件
         // ------------------------------------------------------------------
 
-        public void OnGemCollected(Gem g)
+        /// 劇情走完（站上城牆）：暫停遊戲、放開滑鼠、顯示過關畫面。
+        public void CompleteLevel()
         {
-            if (!gems.Remove(g)) return;
-            gemsCollected++;
-            Burst.At(g.transform.position, new Color(1f, 0.9f, 0.4f));
-            Destroy(g.gameObject);
-            sfxSource.PlayOneShot(collectClip);
-            if (gems.Count == 0)
-            {
-                won = true;
-                Time.timeScale = 0f;
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                ui.ShowWin(playTime, Mathf.CeilToInt(allomancy.Health.current));
-            }
-            else ui.Toast($"Gem!  {gems.Count} left", 1.2f);
+            if (won) return;
+            won = true;
+            Time.timeScale = 0f;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            ui.ShowWin(playTime);
         }
 
-        /// 給 AllomancySession 用：顯示提示訊息。
+        /// 給 AllomancySession / StoryDirector 用：顯示提示訊息。
         public void Toast(string message, float seconds = 2.5f) => ui.Toast(message, seconds);
-
-        /// 還沒撿到的寶石位置（小地圖畫金點用）。
-        public IEnumerable<Vector3> GemPositions()
-        {
-            foreach (var g in gems)
-                if (g != null) yield return g.transform.position;
-        }
 
         public void PlayClick() { if (sfxSource != null) sfxSource.PlayOneShot(clickClip); }
         public void PlayHover() { if (sfxSource != null) sfxSource.PlayOneShot(hoverClip, 0.6f); }
@@ -341,7 +307,7 @@ namespace FunctionSelection
             }
 
             if ((Current == State.InGame || Current == State.Paused) && player != null)
-                ui.UpdateHud(player.def, gemsCollected, gemsCollected + gems.Count, playTime);
+                ui.UpdateHud(player.def, playTime);
         }
 
         void OnDestroy()

@@ -88,7 +88,9 @@ namespace Allomancy
         public string displayName = "Metal";
         public float mass = 1f;                    // 公斤；越重藍線越粗
         public Rigidbody body;                     // 推拉時要移動的剛體（沒有 = 固定在地上，不會動）
-        public Enemy owner;                        // 敵人身上的金屬：推拉會把整個敵人推開 / 拉近
+        public Enemy owner;
+        /// 落腳點（可以沒有）：鐵拉這個固定物時，玩家會沿著拋物線剛好落在這裡（例如對岸的橋面、城牆頂）。
+        public Transform landing;                        // 敵人身上的金屬：推拉會把整個敵人推開 / 拉近
         Renderer[] renderers;
 
         // 重量判斷

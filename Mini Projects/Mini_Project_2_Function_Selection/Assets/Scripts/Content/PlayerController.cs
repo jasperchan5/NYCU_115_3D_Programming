@@ -10,6 +10,7 @@ namespace FunctionSelection
     ///   speedMultiplier：燒白鑞時 × 1.4
     ///   faceCamera     ：瞄準時角色轉向鏡頭前方
     ///   AddImpulse     ：鋼推 / 鐵拉把玩家推開、拉過去，在空中幾乎不減速，才能飛出去
+    ///   Launch         ：拉有落腳點的固定物時，沿算好的拋物線飛過去
     /// 
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
@@ -22,10 +23,12 @@ namespace FunctionSelection
         public float speedMultiplier = 1f;
         public bool faceCamera;
 
-        const float Gravity = 22f;
+        public const float Gravity = 22f;
         CharacterController cc;
-        Vector3 planar, knock;
-        Vector3 push;                              // 鋼推 / 鐵拉給的水平速度（和被怪物撞開的 knock 分開，減速方式不同）
+        Vector3 planar;
+        Vector3 push;                              // 鋼推 / 鐵拉給的水平速度（和走路速度分開，減速方式不同）
+        bool launched;                             // 被「發射」出去、還沒落地：不吃鍵盤輸入，水平速度不衰減
+        float launchTime;
         float vy;
 
         public float Speed01 => def == null ? 0f : planar.magnitude / def.runSpeed;
@@ -48,7 +51,13 @@ namespace FunctionSelection
 
             Vector2 input = Vector2.zero;
             bool run = false, jump = false;
-            if (inputEnabled && kb != null)
+            if (launched)
+            {
+                // 沿拋物線飛行中：落地（起飛 0.15 秒後碰到地面）才恢復控制
+                launchTime += dt;
+                if (launchTime > 0.15f && cc.isGrounded) launched = false;
+            }
+            if (inputEnabled && !launched && kb != null)
             {
                 if (kb.wKey.isPressed || kb.upArrowKey.isPressed) input.y += 1;
                 if (kb.sKey.isPressed || kb.downArrowKey.isPressed) input.y -= 1;
@@ -74,10 +83,9 @@ namespace FunctionSelection
             }
             vy -= Gravity * dt;
 
-            knock = Vector3.MoveTowards(knock, Vector3.zero, 18f * dt);
-            cc.Move((planar + knock + push + Vector3.up * vy) * dt);
+            cc.Move((planar + push + Vector3.up * vy) * dt);
             // 推拉的速度：在地上很快被摩擦力停下，在空中幾乎不減（才能飛出去）
-            push = Vector3.MoveTowards(push, Vector3.zero, (cc.isGrounded ? 25f : 2f) * dt);
+            if (!launched) push = Vector3.MoveTowards(push, Vector3.zero, (cc.isGrounded ? 25f : 2f) * dt);
 
             // 不能走出圍籬
             var flat = new Vector3(transform.position.x, 0, transform.position.z);
@@ -106,12 +114,26 @@ namespace FunctionSelection
             vy = Mathf.Max(vy, 0f) + v.y;
         }
 
+        /// 
+        /// 沿拋物線發射（拉有落腳點的固定物時）：直接「設定」速度，而且飛行中不吃鍵盤、水平速度不衰減，
+        /// 這樣算好的拋物線才會剛好落在落腳點。
+        /// 
+        public void Launch(Vector3 v)
+        {
+            planar = Vector3.zero;
+            push = new Vector3(v.x, 0f, v.z);
+            vy = v.y;
+            launched = true;
+            launchTime = 0f;
+        }
+
         public void Teleport(Vector3 pos)
         {
             cc.enabled = false;
             transform.position = pos;
             cc.enabled = true;
-            planar = knock = push = Vector3.zero;
+            planar = push = Vector3.zero;
+            launched = false;
             vy = 0f;
         }
     }

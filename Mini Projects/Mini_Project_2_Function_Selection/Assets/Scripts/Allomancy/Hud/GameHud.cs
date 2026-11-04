@@ -45,8 +45,13 @@ namespace Allomancy
         static readonly Color ObjectiveColor = new Color(1f, 0.9f, 0.3f);
 
         /// 由外面提供的額外標記（沒有就是 null）。每幀呼叫一次，回傳世界座標。
+        public System.Func<IEnumerable<Vector3>> extraEnemies;
         public System.Func<IEnumerable<Vector3>> objectives;
         RenderTexture mapTexture;
+        Text hint;
+
+        /// 顯示 / 隱藏左下角的操作說明（有劇情提示的關卡會把它關掉，改由劇情一步一步教）。
+        public void SetHintVisible(bool on) => hint.gameObject.SetActive(on);
 
         public static GameHud Create(Canvas canvas, Transform player, MetalReserves reserves, PlayerHealth health)
         {
@@ -161,6 +166,7 @@ namespace Allomancy
             t.rectTransform.anchoredPosition = new Vector2(24f, 20f);
             t.rectTransform.sizeDelta = new Vector2(1300f, 120f);
             t.color = new Color(1, 1, 1, 0.75f);
+            hint = t;
         }
 
         void OnHealthChanged(float delta)
@@ -234,6 +240,8 @@ namespace Allomancy
             if (seeMetal)
                 foreach (var m in MetalObject.All)
                     PlaceMarker(m.CenterOfMass, MetalColor, 4f);
+            if (extraEnemies != null)
+                foreach (var p in extraEnemies()) PlaceMarker(p, EnemyColor, 7f);
             if (objectives != null)
                 foreach (var p in objectives()) PlaceMarker(p, ObjectiveColor, 6f);
 

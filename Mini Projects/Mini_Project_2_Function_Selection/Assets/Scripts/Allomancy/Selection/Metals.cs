@@ -101,6 +101,12 @@ namespace Allomancy
             Toggled?.Invoke(m, burning[i]);
         }
 
+        /// 只補充一種金屬（單一金屬的藥瓶）。
+        public void Refill(Metal m, float add)
+        {
+            amount[(int)m] = Mathf.Clamp01(amount[(int)m] + add);
+        }
+
         public void Refill(float add)
         {
             for (int i = 0; i < MetalInfo.Count; i++)
